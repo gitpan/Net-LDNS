@@ -2,7 +2,7 @@ package Net::LDNS;
 
 use 5.12.4;
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 require XSLoader;
 XSLoader::load( __PACKAGE__, $VERSION );
 
@@ -13,7 +13,7 @@ use Net::LDNS::Packet;
 
 =head1 NAME
 
-    Net::LDNS - Perl wrapper module for the C<ldns> DNS library
+    Net::LDNS - DNS-talking module based on the ldns C library
 
 =head1 SYNOPSIS
 
