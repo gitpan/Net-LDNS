@@ -88,6 +88,14 @@ Reads and/or sets the equivalently named flags.
 
 Returns the length of the packet's wireformat form in octets.
 
+=item edns_size()
+
+Gets and/or sets the EDNS0 UDP size.
+
+=item edns_rcode()
+
+Gets and/or sets the EDNS0 Extended RCODE field.
+
 =item querytime()
 
 Returns the time the query this packet is the answer to took to execute, i milliseconds.
@@ -123,5 +131,9 @@ Returns a string with the packet and its contents in common presentation format.
 =item wireformat()
 
 Returns a Perl string holding the packet in wire format.
+
+=item type()
+
+Returns the ldns library's guess as to the content of the packet. One of the strings C<question>, C<referral>, C<answer>, C<nxdomain>, C<nodata> or C<unknown>.
 
 =back
