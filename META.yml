@@ -3,13 +3,13 @@ abstract: 'Perl wrapper for the ldns DNS library.'
 author:
   - 'Calle Dybedahl <calle@init.se>'
 build_requires:
-  Devel::CheckLib: '0.4'
+  Devel::CheckLib: 0.4
   Devel::PPPort: 3.19
   ExtUtils::MakeMaker: 6.59
   JSON::XS: 0
   Test::Fatal: 0
 configure_requires:
-  Devel::CheckLib: '0.4'
+  Devel::CheckLib: 0.4
   Devel::PPPort: 3.19
   ExtUtils::MakeMaker: 6.59
   ExtUtils::ParseXS: 3.18
@@ -31,4 +31,4 @@ requires:
   perl: 5.12.4
 resources:
   license: http://opensource.org/licenses/bsd-license.php
-version: '0.61'
+version: 0.62

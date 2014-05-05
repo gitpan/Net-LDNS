@@ -2,7 +2,7 @@ package Net::LDNS;
 
 use 5.12.4;
 
-our $VERSION = '0.61';
+our $VERSION = '0.62';
 require XSLoader;
 XSLoader::load( __PACKAGE__, $VERSION );
 
@@ -94,6 +94,10 @@ Get and optionally set the number of retries.
 
 Get and optionally set the number of seconds between retries.
 
+=item edns_size($size)
+
+Get and optionally set the EDNS0 UDP maximum size.
+
 =item axfr_start($domain,$class)
 
 Set this resolver object up for a zone transfer of the specified domain. If C<$class> is not given, it defaults to IN.
@@ -117,5 +121,9 @@ Returns false if there is a started zone transfer with more records to get, and 
 
 If L<axfr_next()> threw an exception, this method returns the L<Net::LDNS::Packet> that made it do so. The packet's RCODE is likely to say what
 the problem was (for example, NOTAUTH or NXDOMAIN).
+
+=item timeout($time)
+
+Get and/or set the socket timeout for the resolver.
 
 =back

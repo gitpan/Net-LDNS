@@ -142,6 +142,7 @@ new(class, ...)
         }
         else {
             RETVAL = ldns_resolver_new();
+            ldns_resolver_set_recursive(RETVAL, 1);
             for (i=1;i<items;i++)
             {
                 ldns_status s;
@@ -182,6 +183,7 @@ query(obj, dname, rrtype="A", rrclass="IN")
         ldns_rr_class c;
         ldns_status status;
         ldns_pkt *pkt;
+        uint16_t flags = 0;
 
         t = ldns_get_rr_type_by_name(rrtype);
         if(!t)
@@ -200,7 +202,18 @@ query(obj, dname, rrtype="A", rrclass="IN")
         {
             croak("Invalid domain name: %s", dname);
         }
-        status = ldns_resolver_send(&pkt, obj, domain, t, c, LDNS_RD);
+
+        if(ldns_resolver_recursive(obj))
+        {
+            flags |= LDNS_RD;
+        }
+
+        if(ldns_resolver_dnssec_cd(obj))
+        {
+            flags |= LDNS_CD;
+        }
+
+        status = ldns_resolver_send(&pkt, obj, domain, t, c, flags);
         if ( status != LDNS_STATUS_OK) {
             croak("%s", ldns_get_errorstr_by_id(status));
             RETVAL = NULL;
@@ -285,6 +298,18 @@ retrans(obj,...)
             ldns_resolver_set_retrans(obj, SvIV(ST(1)));
         }
         RETVAL = ldns_resolver_retrans(obj);
+    OUTPUT:
+        RETVAL
+
+U16
+edns_size(obj,...)
+    Net::LDNS obj;
+    CODE:
+        if( items > 1 )
+        {
+            ldns_resolver_set_edns_udp_size(obj, (U16)SvIV(ST(1)));
+        }
+        RETVAL = ldns_resolver_edns_udp_size(obj);
     OUTPUT:
         RETVAL
 
@@ -454,6 +479,29 @@ axfr_last_packet(obj)
     Net::LDNS obj;
     CODE:
         RETVAL = ldns_axfr_last_pkt(obj);
+    OUTPUT:
+        RETVAL
+
+double
+timeout(obj,...)
+    Net::LDNS obj;
+    CODE:
+        struct timeval tv;
+
+        if( items > 1)
+        {
+            double dec_part, int_part;
+            struct timeval tn;
+
+            dec_part = modf(SvNV(ST(1)), &int_part);
+            tn.tv_sec  = int_part;
+            tn.tv_usec = 1000000*dec_part;
+            ldns_resolver_set_timeout(obj, tn);
+        }
+
+        tv = ldns_resolver_timeout(obj);
+        RETVAL = (double)tv.tv_sec;
+        RETVAL += ((double)tv.tv_usec)/1000000;
     OUTPUT:
         RETVAL
 
@@ -1101,6 +1149,20 @@ rr_rd_count(obj)
     Net::LDNS::RR obj;
     CODE:
         RETVAL = ldns_rr_rd_count(obj);
+    OUTPUT:
+        RETVAL
+
+SV *
+rr_rdf(obj,n)
+    Net::LDNS::RR obj;
+    size_t n;
+    CODE:
+        ldns_rdf *rdf = ldns_rr_rdf(obj,n);
+        if(rdf==NULL)
+        {
+            croak("Trying to fetch nonexistent RDATA at position %lu", n);
+        }
+        RETVAL = newSVpvn((char*)ldns_rdf_data(rdf), ldns_rdf_size(rdf));
     OUTPUT:
         RETVAL
 
