@@ -11,6 +11,9 @@
 #include <ctype.h>
 #include <ldns/ldns.h>
 
+/* ldns does not have this in its header files, but it is in the published documentation and we need it */
+void ldns_axfr_abort(ldns_resolver *obj);
+
 typedef ldns_resolver *Net__LDNS;
 typedef ldns_pkt *Net__LDNS__Packet;
 typedef ldns_rr_list *Net__LDNS__RRList;
@@ -130,19 +133,21 @@ lib_version()
     OUTPUT:
         RETVAL
 
-Net::LDNS
+SV *
 new(class, ...)
     char *class;
     CODE:
     {
         int i;
+        ldns_resolver *res;
+        RETVAL = newSV(0);
 
         if (items == 1 ) { /* Called without arguments, use resolv.conf */
-            ldns_resolver_new_frm_file(&RETVAL,NULL);
+            ldns_resolver_new_frm_file(&res,NULL);
         }
         else {
-            RETVAL = ldns_resolver_new();
-            ldns_resolver_set_recursive(RETVAL, 1);
+            res = ldns_resolver_new();
+            ldns_resolver_set_recursive(res, 1);
             for (i=1;i<items;i++)
             {
                 ldns_status s;
@@ -159,13 +164,14 @@ new(class, ...)
                 if ( addr == NULL ) {
                     croak("Failed to parse IP address: %s", SvPV_nolen(ST(i)));
                 }
-                s = ldns_resolver_push_nameserver(RETVAL, addr);
+                s = ldns_resolver_push_nameserver(res, addr);
                 if(s != LDNS_STATUS_OK)
                 {
                     croak("Adding nameserver failed: %s", ldns_get_errorstr_by_id(s));
                 }
             }
         }
+        sv_setref_pv(RETVAL, class, res);
     }
     OUTPUT:
         RETVAL
@@ -409,6 +415,89 @@ addr2name(obj,addr_in)
     }
 
 bool
+axfr(obj,dname,callback,class="IN")
+    Net::LDNS obj;
+    const char *dname;
+    SV *callback;
+    const char *class;
+    CODE:
+    {
+        ldns_rdf *domain = ldns_rdf_new_frm_str(LDNS_RDF_TYPE_DNAME, dname);
+        ldns_rr_class cl = ldns_get_rr_class_by_name(class);
+        ldns_status status;
+
+        if(SvTYPE(SvRV(callback)) != SVt_PVCV)
+        {
+            croak("Callback not a code reference");
+        }
+
+        if(domain==NULL)
+        {
+            croak("Name error for '%s", dname);
+        }
+
+        if(!cl)
+        {
+            croak("Unknown RR class: %s", class);
+        }
+
+        status = ldns_axfr_start(obj, domain, cl);
+
+        if(status != LDNS_STATUS_OK)
+        {
+            croak("AXFR setup error: %s", ldns_get_errorstr_by_id(status));
+        }
+
+        RETVAL = 1;
+        while (!ldns_axfr_complete(obj))
+        {
+            int count;
+            SV *ret;
+            ldns_rr *rr = ldns_axfr_next(obj);
+            if(rr==NULL)
+            {
+                ldns_pkt *pkt = ldns_axfr_last_pkt(obj);
+                if(pkt != NULL)
+                {
+                    croak("AXFR transfer error: %s", ldns_pkt_rcode2str(ldns_pkt_get_rcode(pkt)));
+                }
+                else {
+                    croak("AXFR transfer error: unknown problem");
+                }
+            }
+
+            /* Enter the Cargo Cult */
+            ENTER;
+            SAVETMPS;
+            PUSHMARK(SP);
+            mXPUSHs(rr2sv(rr));
+            PUTBACK;
+            count = call_sv(callback, G_SCALAR);
+            SPAGAIN;
+
+            if(count != 1)
+            {
+                croak("Callback did not return exactly one value in scalar context");
+            }
+
+            ret = POPs;
+
+            if(!SvTRUE(ret))
+            {
+                RETVAL = 0;
+                break;
+            }
+            PUTBACK;
+            FREETMPS;
+            LEAVE;
+            /* Callback magic ends */
+        }
+        ldns_axfr_abort(obj);
+    }
+    OUTPUT:
+        RETVAL
+
+bool
 axfr_start(obj,dname,class="IN")
     Net::LDNS obj;
     const char *dname;
@@ -444,12 +533,13 @@ axfr_next(obj)
         ldns_rr *rr;
 
         /* ldns unfortunately prints to standard error, so close it while we call them */
+        /* EDIT: That behavior should be changed starting with ldns 1.6.17, but we'll keep the closing for a while */
         int err_fd = fileno(stderr);            /* Remember fd for stderr */
         int save_fd = dup(err_fd);              /* Copy open fd for stderr */
         int tmp_fd;
 
         fflush(stderr);                         /* Print anything waiting */
-        tmp_fd = open("/dev/null",O_RDWR);    /* Open something to allocate the now-free fd stderr used */
+        tmp_fd = open("/dev/null",O_RDWR);      /* Open something to allocate the now-free fd stderr used */
         dup2(tmp_fd,err_fd);
         rr = ldns_axfr_next(obj);               /* Shut up */
         close(tmp_fd);                          /* Close the placeholder */
@@ -509,11 +599,12 @@ void
 DESTROY(obj)
     Net::LDNS obj;
     CODE:
+        ldns_axfr_abort(obj);
         ldns_resolver_free(obj);
 
 MODULE = Net::LDNS        PACKAGE = Net::LDNS::Packet           PREFIX=packet_
 
-Net::LDNS::Packet
+SV *
 packet_new(objclass,name,type="A",class="IN")
     char *objclass;
     char *name;
@@ -524,6 +615,7 @@ packet_new(objclass,name,type="A",class="IN")
         ldns_rdf *rr_name;
         ldns_rr_type rr_type;
         ldns_rr_class rr_class;
+        ldns_pkt *pkt;
         
         rr_type = ldns_get_rr_type_by_name(type);
         if(!rr_type)
@@ -543,7 +635,9 @@ packet_new(objclass,name,type="A",class="IN")
             croak("Name error for '%s'", name);
         }
         
-        RETVAL = ldns_pkt_query_new(rr_name, rr_type, rr_class,0);
+        pkt = ldns_pkt_query_new(rr_name, rr_type, rr_class,0);
+        RETVAL = newSV(0);
+        sv_setref_pv(RETVAL, objclass, pkt);
     }
     OUTPUT:
         RETVAL
@@ -967,6 +1061,28 @@ packet_edns_rcode(obj,...)
             ldns_pkt_set_edns_extended_rcode(obj, (U8)SvIV(ST(1)));
         }
         RETVAL = ldns_pkt_edns_extended_rcode(obj);
+    OUTPUT:
+        RETVAL
+
+U8
+packet_edns_version(obj,...)
+    Net::LDNS::Packet obj;
+    CODE:
+        if(items>=2)
+        {
+            ldns_pkt_set_edns_version(obj, (U8)SvIV(ST(1)));
+        }
+        RETVAL = ldns_pkt_edns_version(obj);
+    OUTPUT:
+        RETVAL
+
+bool
+packet_needs_edns(obj)
+    Net::LDNS::Packet obj;
+    ALIAS:
+        Net::LDNS::Packet::has_edns = 1
+    CODE:
+        RETVAL = ldns_pkt_edns(obj);
     OUTPUT:
         RETVAL
 
