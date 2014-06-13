@@ -1,8 +1,13 @@
 package Net::LDNS;
 
-use 5.12.4;
+use 5.10.1;
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
+
+use parent 'Exporter';
+our @EXPORT_OK = qw[to_idn has_idn ldns_version];
+our %EXPORT_TAGS = ( all => \@EXPORT_OK );
+
 require XSLoader;
 XSLoader::load( __PACKAGE__, $VERSION );
 
@@ -25,13 +30,26 @@ use Net::LDNS::Packet;
 
 C<Net::LDNS> represents a resolver, which is the part of the system responsible for sending queries and receiving answers to them.
 
-=head1 FUNCTION
+=head1 EXPORTABLE FUNCTIONS
 
 =over
 
 =item lib_version()
 
-Returns the ldns version string.
+Returns the ldns version string. Can be exported, but is not by default.
+
+=item to_idn($name, ...)
+
+Takes a number of strings and returns a list of them converted to IDNA format.
+Assumes that the strings have been converted to Perl's internal encoding before
+it's called. Can be exported, but is not by default.
+
+This function requires that GNU libidn was present when L<Net::LDNS> was
+compiled. If not, calling C<to_idn> will result in an exception getting thrown.
+
+=item has_idn()
+
+Takes no arguments. Returns true if libidn was present at compilation, false if not.
 
 =back
 

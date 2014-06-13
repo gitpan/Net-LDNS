@@ -2,6 +2,7 @@
 #include "perl.h"
 #include "XSUB.h"
 
+#define NEED_newSVpvn_share
 #define NEED_sv_2pv_flags
 #define NEED_newRV_noinc
 #include "ppport.h"
@@ -11,8 +12,15 @@
 #include <ctype.h>
 #include <ldns/ldns.h>
 
-/* ldns does not have this in its header files, but it is in the published documentation and we need it */
+#ifdef WE_CAN_HAZ_IDN
+#include <idna.h>
+#endif
+
+/* ldns 1.6.17 does not have this in its header files, but it is in the published documentation and we need it */
+/* It looks like 1.6.18 will have it, but we'll fix that when it happens. */
+#if (LDNS_REVISION) >= ((1<<16)|(6<<8)|(17))
 void ldns_axfr_abort(ldns_resolver *obj);
+#endif
 
 typedef ldns_resolver *Net__LDNS;
 typedef ldns_pkt *Net__LDNS__Packet;
@@ -125,6 +133,47 @@ rr2sv(ldns_rr *rr)
 MODULE = Net::LDNS        PACKAGE = Net::LDNS
 
 PROTOTYPES: ENABLE
+
+SV *
+to_idn(...)
+    PPCODE:
+    {
+#ifdef WE_CAN_HAZ_IDN
+        int i;
+        for( i = 0; i<items; i++ )
+        {
+            char *out;
+            int status;
+            SV *obj = ST(i);
+
+            status = idna_to_ascii_8z(SvPV_nolen(obj), &out, IDNA_ALLOW_UNASSIGNED);
+            if (status == IDNA_SUCCESS)
+            {
+                SV *new = newSVpv(out,0);
+                SvUTF8_on(new); /* We know the string is plain ASCII, so let Perl know too */
+                mXPUSHs(new);
+            }
+            else
+            {
+               croak("Error: %s\n", idna_strerror(status));
+            }
+            free(out);
+        }
+#else
+        croak("libidn not installed");
+#endif
+    }
+
+bool
+has_idn()
+    CODE:
+#ifdef WE_CAN_HAZ_IDN
+        RETVAL = 1;
+#else
+        RETVAL = 0;
+#endif
+    OUTPUT:
+        RETVAL
 
 const char *
 lib_version()
@@ -501,7 +550,9 @@ axfr(obj,dname,callback,class="IN")
             LEAVE;
             /* Callback magic ends */
         }
+#if (LDNS_REVISION) >= ((1<<16)|(6<<8)|(17))
         ldns_axfr_abort(obj);
+#endif
     }
     OUTPUT:
         RETVAL
@@ -608,7 +659,9 @@ void
 DESTROY(obj)
     Net::LDNS obj;
     CODE:
+#if (LDNS_REVISION) >= ((1<<16)|(6<<8)|(17))
         ldns_axfr_abort(obj);
+#endif
         ldns_resolver_free(obj);
 
 MODULE = Net::LDNS        PACKAGE = Net::LDNS::Packet           PREFIX=packet_

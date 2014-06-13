@@ -28,7 +28,7 @@ no_index:
 requires:
   MIME::Base64: 0
   XSLoader: 0.02
-  perl: 5.12.4
+  perl: 5.10.1
 resources:
   license: http://opensource.org/licenses/bsd-license.php
-version: '0.64'
+version: '0.65'
