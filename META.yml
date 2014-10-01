@@ -6,7 +6,7 @@ build_requires:
   Devel::CheckLib: '0.4'
   Devel::PPPort: 3.19
   ExtUtils::MakeMaker: 6.59
-  JSON::XS: 0
+  JSON::PP: 0
   Test::Fatal: 0
 configure_requires:
   Devel::CheckLib: '0.4'
@@ -31,4 +31,4 @@ requires:
   perl: 5.10.1
 resources:
   license: http://opensource.org/licenses/bsd-license.php
-version: '0.67'
+version: '0.68'
