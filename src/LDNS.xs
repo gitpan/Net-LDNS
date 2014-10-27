@@ -106,6 +106,27 @@ typedef ldns_rr *Net__LDNS__RR__X25;
 #define D_U16(what,where) ldns_rdf2native_int16(ldns_rr_rdf(what,where))
 #define D_U32(what,where) ldns_rdf2native_int32(ldns_rr_rdf(what,where))
 
+char *
+randomize_capitalization(char *in)
+{
+#ifdef RANDOMIZE
+	char *str;
+	str = in;
+	while(*str) {
+		if(Drand01() < 0.5)
+		{
+			*str = tolower(*str);
+		}
+		else
+		{
+			*str = toupper(*str);
+		}
+		str++;
+	}
+#endif
+	return in;
+}
+
 SV *
 rr2sv(ldns_rr *rr)
 {
@@ -371,6 +392,17 @@ dnssec(obj,...)
         RETVAL
 
 bool
+cd(obj,...)
+    Net::LDNS obj;
+    CODE:
+        if ( items > 1 ) {
+            ldns_resolver_set_dnssec_cd(obj, SvIV(ST(1)));
+        }
+        RETVAL = ldns_resolver_dnssec_cd(obj);
+    OUTPUT:
+        RETVAL
+
+bool
 usevc(obj,...)
     Net::LDNS obj;
     CODE:
@@ -512,7 +544,7 @@ addr2name(obj,addr_in)
             {
                 ldns_rr *rr = ldns_rr_list_rr(names,i);
                 ldns_rdf *name_rdf = ldns_rr_rdf(rr,0);
-                char *name_str = ldns_rdf2str(name_rdf);
+                char *name_str = randomize_capitalization(ldns_rdf2str(name_rdf));
 
                 SV* sv = newSVpv(name_str,0);
                 mXPUSHs(sv);
@@ -1381,7 +1413,7 @@ char *
 rr_owner(obj)
     Net::LDNS::RR obj;
     CODE:
-        RETVAL = ldns_rdf2str(ldns_rr_owner(obj));
+        RETVAL = randomize_capitalization(ldns_rdf2str(ldns_rr_owner(obj)));
     OUTPUT:
         RETVAL
     CLEANUP:
@@ -1471,7 +1503,7 @@ char *
 rr_ns_nsdname(obj)
     Net::LDNS::RR::NS obj;
     CODE:
-        RETVAL = ldns_rdf2str(ldns_rr_rdf(obj, 0));
+        RETVAL = randomize_capitalization(ldns_rdf2str(ldns_rr_rdf(obj, 0)));
     OUTPUT:
         RETVAL
     CLEANUP:
@@ -1492,7 +1524,7 @@ char *
 rr_mx_exchange(obj)
     Net::LDNS::RR::MX obj;
     CODE:
-        RETVAL = D_STRING(obj, 1);
+        RETVAL = randomize_capitalization(D_STRING(obj, 1));
     OUTPUT:
         RETVAL
     CLEANUP:
@@ -1531,7 +1563,7 @@ char *
 rr_soa_mname(obj)
     Net::LDNS::RR::SOA obj;
     CODE:
-        RETVAL = D_STRING(obj,0);
+        RETVAL = randomize_capitalization(D_STRING(obj,0));
     OUTPUT:
         RETVAL
     CLEANUP:
@@ -1541,7 +1573,7 @@ char *
 rr_soa_rname(obj)
     Net::LDNS::RR::SOA obj;
     CODE:
-        RETVAL = D_STRING(obj,1);
+        RETVAL = randomize_capitalization(D_STRING(obj,1));
     OUTPUT:
         RETVAL
     CLEANUP:
@@ -1871,6 +1903,16 @@ rr_rrsig_verify_time(obj,rrset_in,keys_in, when, msg)
         ldns_rr_list *sig   = ldns_rr_list_new();
         ldns_rr_list *good  = ldns_rr_list_new();
 
+		if(av_len(rrset_in)==-1)
+		{
+			croak("RRset is empty");
+		}
+
+		if(av_len(keys_in)==-1)
+		{
+			croak("Key list is empty");
+		}
+
         /* Make a list with only the RRSIG */
         ldns_rr_list_push_rr(sig, obj);
 
@@ -1921,7 +1963,7 @@ char *
 rr_nsec_next(obj)
     Net::LDNS::RR::NSEC obj;
     CODE:
-        RETVAL = D_STRING(obj,0);
+        RETVAL = randomize_capitalization(D_STRING(obj,0));
     OUTPUT:
         RETVAL
 
@@ -2138,7 +2180,7 @@ char *
 rr_ptr_ptrdname(obj)
     Net::LDNS::RR::PTR obj;
     CODE:
-        RETVAL = D_STRING(obj,0);
+        RETVAL = randomize_capitalization(D_STRING(obj,0));
     OUTPUT:
         RETVAL
     CLEANUP:
@@ -2151,7 +2193,7 @@ char *
 rr_cname_cname(obj)
     Net::LDNS::RR::CNAME obj;
     CODE:
-        RETVAL = D_STRING(obj,0);
+        RETVAL = randomize_capitalization(D_STRING(obj,0));
     OUTPUT:
         RETVAL
     CLEANUP:

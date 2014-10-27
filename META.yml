@@ -31,4 +31,4 @@ requires:
   perl: 5.10.1
 resources:
   license: http://opensource.org/licenses/bsd-license.php
-version: '0.68'
+version: '0.70'
